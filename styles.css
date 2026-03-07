@@ -1,0 +1,54 @@
+/* Link Exporter - Modal Styles */
+
+.link-exporter-modal {
+	padding: 1em 0;
+}
+
+.link-exporter-modal h2 {
+	margin-top: 0;
+	margin-bottom: 0.5em;
+}
+
+.link-exporter-source {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	margin-bottom: 1em;
+}
+
+.link-exporter-depth-value {
+	display: inline-block;
+	min-width: 2em;
+	text-align: center;
+	font-weight: 600;
+	font-size: var(--font-ui-medium);
+	margin-left: 0.5em;
+	color: var(--text-accent);
+}
+
+.link-exporter-dir-container {
+	margin-bottom: 1em;
+}
+
+.link-exporter-path-display {
+	padding: 0.5em 0.75em;
+	background: var(--background-secondary);
+	border-radius: var(--radius-s);
+	margin-bottom: 0.5em;
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	word-break: break-all;
+}
+
+.link-exporter-browse-btn {
+	cursor: pointer;
+}
+
+.link-exporter-status {
+	margin-top: 1em;
+	padding: 0.5em 0.75em;
+	background: var(--background-secondary);
+	border-radius: var(--radius-s);
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+	text-align: center;
+}

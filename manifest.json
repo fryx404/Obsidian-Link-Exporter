@@ -1,0 +1,9 @@
+{
+	"id": "obsidian-link-exporter",
+	"name": "FRYX Link Exporter",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "MOCを再帰的にエクスポート。",
+	"author": "fryx404",
+	"isDesktopOnly": true
+}
