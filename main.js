@@ -46,15 +46,53 @@ var LinkExporterPlugin = class extends import_obsidian.Plugin {
         this.openExportModal();
       }
     });
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        menu.addItem((item) => {
+          item.setTitle("Export linked files").setIcon("folder-output").onClick(() => {
+            this.openExportModal([file]);
+          });
+        });
+      })
+    );
+    this.registerEvent(
+      this.app.workspace.on("files-menu", (menu, files) => {
+        menu.addItem((item) => {
+          item.setTitle(`Export ${files.length} items`).setIcon("folder-output").onClick(() => {
+            this.openExportModal(files);
+          });
+        });
+      })
+    );
     this.addSettingTab(new LinkExporterSettingTab(this.app, this));
   }
-  openExportModal() {
-    const activeFile = this.app.workspace.getActiveFile();
-    if (!activeFile) {
-      new import_obsidian.Notice("\u30A8\u30AF\u30B9\u30DD\u30FC\u30C8\u5143\u306E\u30D5\u30A1\u30A4\u30EB\u3092\u958B\u3044\u3066\u304F\u3060\u3055\u3044\u3002");
+  openExportModal(files) {
+    let targetFiles = [];
+    if (files && files.length > 0) {
+      targetFiles = this.getMarkdownFilesInAbstractFiles(files);
+    } else {
+      const activeFile = this.app.workspace.getActiveFile();
+      if (activeFile && activeFile.extension === "md") {
+        targetFiles = [activeFile];
+      }
+    }
+    if (targetFiles.length === 0) {
+      new import_obsidian.Notice("\u30A8\u30AF\u30B9\u30DD\u30FC\u30C8\u5BFE\u8C61\u306EMarkdown\u30D5\u30A1\u30A4\u30EB\u304C\u898B\u3064\u304B\u308A\u307E\u305B\u3093\u3002");
       return;
     }
-    new ExportModal(this.app, this, activeFile).open();
+    new ExportModal(this.app, this, targetFiles).open();
+  }
+  getMarkdownFilesInAbstractFiles(files) {
+    const mdFiles = [];
+    for (const file of files) {
+      if (file instanceof import_obsidian.TFile && file.extension === "md") {
+        mdFiles.push(file);
+      } else if (file instanceof import_obsidian.TFolder) {
+        const children = this.getMarkdownFilesInAbstractFiles(file.children);
+        mdFiles.push(...children);
+      }
+    }
+    return Array.from(new Set(mdFiles));
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -64,10 +102,10 @@ var LinkExporterPlugin = class extends import_obsidian.Plugin {
   }
 };
 var ExportModal = class extends import_obsidian.Modal {
-  constructor(app, plugin, sourceFile) {
+  constructor(app, plugin, sourceFiles) {
     super(app);
     this.plugin = plugin;
-    this.sourceFile = sourceFile;
+    this.sourceFiles = sourceFiles;
     this.maxDepth = plugin.settings.defaultMaxDepth;
     this.exportDir = plugin.settings.defaultExportDir;
     this.exportOutsideVault = plugin.settings.exportOutsideVault;
@@ -76,8 +114,9 @@ var ExportModal = class extends import_obsidian.Modal {
     const { contentEl } = this;
     contentEl.addClass("link-exporter-modal");
     contentEl.createEl("h2", { text: "Export Linked Files" });
+    const sourceText = this.sourceFiles.length === 1 ? `\u30BD\u30FC\u30B9: ${this.sourceFiles[0].basename}` : `\u30BD\u30FC\u30B9: ${this.sourceFiles[0].basename} \u306A\u3069\u8A08 ${this.sourceFiles.length} \u4EF6`;
     contentEl.createEl("p", {
-      text: `\u30BD\u30FC\u30B9: ${this.sourceFile.basename}`,
+      text: sourceText,
       cls: "link-exporter-source"
     });
     const depthSetting = new import_obsidian.Setting(contentEl).setName("\u63A2\u7D22\u968E\u5C64").setDesc("0 = \u3053\u306E\u30D5\u30A1\u30A4\u30EB\u306E\u307F\u30011 = \u76F4\u63A5\u30EA\u30F3\u30AF\u5148\u30012+ = \u30EA\u30F3\u30AF\u5148\u306E\u30EA\u30F3\u30AF\u5148...");
@@ -179,7 +218,9 @@ var ExportModal = class extends import_obsidian.Modal {
           }
         }
       };
-      await exportRecursive(this.sourceFile, 0);
+      for (const file of this.sourceFiles) {
+        await exportRecursive(file, 0);
+      }
       updateStatus(`\u5B8C\u4E86: ${count} \u30D5\u30A1\u30A4\u30EB\u3092 ${exportPath} \u306B\u30A8\u30AF\u30B9\u30DD\u30FC\u30C8\u3057\u307E\u3057\u305F`);
       new import_obsidian.Notice(`${count} \u500B\u306E\u30D5\u30A1\u30A4\u30EB\u3092 ${exportPath} \u306B\u30A8\u30AF\u30B9\u30DD\u30FC\u30C8\u3057\u307E\u3057\u305F`);
     } else {
@@ -212,7 +253,9 @@ var ExportModal = class extends import_obsidian.Modal {
           }
         }
       };
-      await exportRecursive(this.sourceFile, 0);
+      for (const file of this.sourceFiles) {
+        await exportRecursive(file, 0);
+      }
       updateStatus(`\u5B8C\u4E86: ${count} \u30D5\u30A1\u30A4\u30EB\u3092 ${exportDirName} \u306B\u30A8\u30AF\u30B9\u30DD\u30FC\u30C8\u3057\u307E\u3057\u305F`);
       new import_obsidian.Notice(`${count} \u500B\u306E\u30D5\u30A1\u30A4\u30EB\u3092 ${exportDirName} \u306B\u30A8\u30AF\u30B9\u30DD\u30FC\u30C8\u3057\u307E\u3057\u305F`);
     }

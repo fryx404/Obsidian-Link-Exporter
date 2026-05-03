@@ -1,4 +1,4 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile, TFolder } from 'obsidian';
+import { App, Menu, Modal, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile, TFolder } from 'obsidian';
 
 // ─── 設定 ──────────────────────────────────────────
 
@@ -36,17 +36,70 @@ export default class LinkExporterPlugin extends Plugin {
             },
         });
 
+        // ファイルエクスプローラーのコンテキストメニュー（単一選択）
+        this.registerEvent(
+            this.app.workspace.on('file-menu', (menu: Menu, file: TAbstractFile) => {
+                menu.addItem((item) => {
+                    item.setTitle('Export linked files')
+                        .setIcon('folder-output')
+                        .onClick(() => {
+                            this.openExportModal([file]);
+                        });
+                });
+            })
+        );
+
+        // ファイルエクスプローラーのコンテキストメニュー（複数選択）
+        this.registerEvent(
+            this.app.workspace.on('files-menu', (menu: Menu, files: TAbstractFile[]) => {
+                menu.addItem((item) => {
+                    item.setTitle(`Export ${files.length} items`)
+                        .setIcon('folder-output')
+                        .onClick(() => {
+                            this.openExportModal(files);
+                        });
+                });
+            })
+        );
+
         // 設定タブ
         this.addSettingTab(new LinkExporterSettingTab(this.app, this));
     }
 
-    private openExportModal() {
-        const activeFile = this.app.workspace.getActiveFile();
-        if (!activeFile) {
-            new Notice('エクスポート元のファイルを開いてください。');
+    private openExportModal(files?: TAbstractFile[]) {
+        let targetFiles: TFile[] = [];
+
+        if (files && files.length > 0) {
+            targetFiles = this.getMarkdownFilesInAbstractFiles(files);
+        } else {
+            // コマンドやリボンアイコンからの実行（引数なし）
+            const activeFile = this.app.workspace.getActiveFile();
+            if (activeFile && activeFile.extension === 'md') {
+                targetFiles = [activeFile];
+            }
+        }
+
+        if (targetFiles.length === 0) {
+            new Notice('エクスポート対象のMarkdownファイルが見つかりません。');
             return;
         }
-        new ExportModal(this.app, this, activeFile).open();
+
+        new ExportModal(this.app, this, targetFiles).open();
+    }
+
+    private getMarkdownFilesInAbstractFiles(files: TAbstractFile[]): TFile[] {
+        const mdFiles: TFile[] = [];
+        for (const file of files) {
+            if (file instanceof TFile && file.extension === 'md') {
+                mdFiles.push(file);
+            } else if (file instanceof TFolder) {
+                // フォルダ内のファイルを再帰的に取得
+                const children = this.getMarkdownFilesInAbstractFiles(file.children);
+                mdFiles.push(...children);
+            }
+        }
+        // 重複排除
+        return Array.from(new Set(mdFiles));
     }
 
     async loadSettings() {
@@ -62,16 +115,16 @@ export default class LinkExporterPlugin extends Plugin {
 
 class ExportModal extends Modal {
     plugin: LinkExporterPlugin;
-    sourceFile: TFile;
+    sourceFiles: TFile[];
     maxDepth: number;
     exportDir: string;
     exportOutsideVault: boolean;
     statusEl: HTMLElement;
 
-    constructor(app: App, plugin: LinkExporterPlugin, sourceFile: TFile) {
+    constructor(app: App, plugin: LinkExporterPlugin, sourceFiles: TFile[]) {
         super(app);
         this.plugin = plugin;
-        this.sourceFile = sourceFile;
+        this.sourceFiles = sourceFiles;
         this.maxDepth = plugin.settings.defaultMaxDepth;
         this.exportDir = plugin.settings.defaultExportDir;
         this.exportOutsideVault = plugin.settings.exportOutsideVault;
@@ -83,8 +136,13 @@ class ExportModal extends Modal {
 
         // ヘッダー
         contentEl.createEl('h2', { text: 'Export Linked Files' });
+
+        const sourceText = this.sourceFiles.length === 1 
+            ? `ソース: ${this.sourceFiles[0].basename}` 
+            : `ソース: ${this.sourceFiles[0].basename} など計 ${this.sourceFiles.length} 件`;
+
         contentEl.createEl('p', {
-            text: `ソース: ${this.sourceFile.basename}`,
+            text: sourceText,
             cls: 'link-exporter-source',
         });
 
@@ -232,7 +290,9 @@ class ExportModal extends Modal {
                 }
             };
 
-            await exportRecursive(this.sourceFile, 0);
+            for (const file of this.sourceFiles) {
+                await exportRecursive(file, 0);
+            }
             updateStatus(`完了: ${count} ファイルを ${exportPath} にエクスポートしました`);
             new Notice(`${count} 個のファイルを ${exportPath} にエクスポートしました`);
 
@@ -272,7 +332,9 @@ class ExportModal extends Modal {
                 }
             };
 
-            await exportRecursive(this.sourceFile, 0);
+            for (const file of this.sourceFiles) {
+                await exportRecursive(file, 0);
+            }
             updateStatus(`完了: ${count} ファイルを ${exportDirName} にエクスポートしました`);
             new Notice(`${count} 個のファイルを ${exportDirName} にエクスポートしました`);
         }
